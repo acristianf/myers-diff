@@ -21,10 +21,10 @@ pub fn match(comptime T: type, a: T, b: T) !bool {
 }
 
 /// Returns minimal distance edit script using myers diff
-pub fn distance(comptime T: type, a: []const T, b: []const T, out_buf: []usize) !usize {
+pub fn distance(comptime T: type, a: []const T, b: []const T, scratch: []usize) !usize {
     const max = a.len + b.len;
-    std.debug.assert(2 * max + 1 <= out_buf.len);
-    @memset(out_buf, 0);
+    std.debug.assert(2 * max + 1 <= scratch.len);
+    @memset(scratch, 0);
 
     var k: isize = 0;
     var mles: usize = 0;
@@ -34,10 +34,10 @@ pub fn distance(comptime T: type, a: []const T, b: []const T, out_buf: []usize) 
         while (k <= d) : (k += 2) {
             var x: isize = 0;
             const shifted_k: usize = @intCast(k + @as(isize, @intCast(max)));
-            if (k == -d or k != d and out_buf[shifted_k - 1] < out_buf[shifted_k + 1]) {
-                x = @intCast(out_buf[shifted_k + 1]);
+            if (k == -d or k != d and scratch[shifted_k - 1] < scratch[shifted_k + 1]) {
+                x = @intCast(scratch[shifted_k + 1]);
             } else {
-                x = @intCast(out_buf[shifted_k - 1] + 1);
+                x = @intCast(scratch[shifted_k - 1] + 1);
             }
             var y: isize = x - k;
 
@@ -46,7 +46,7 @@ pub fn distance(comptime T: type, a: []const T, b: []const T, out_buf: []usize) 
                 y += 1;
             }
 
-            out_buf[shifted_k] = @intCast(x);
+            scratch[shifted_k] = @intCast(x);
 
             if (x >= a.len and y >= b.len) {
                 mles = u;
