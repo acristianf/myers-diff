@@ -199,7 +199,7 @@ test "distance" {
     const a = "ABCABBA";
     const b = "CBABAC";
     var out_buf: [128]usize = undefined;
-    std.testing.expect(try distance(u8, a, b, &out_buf) == 5);
+    try std.testing.expect(try distance(u8, a, b, &out_buf) == 5);
 }
 
 // test "[]const u8 diff" {
