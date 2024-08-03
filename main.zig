@@ -5,6 +5,21 @@ const Point = struct {
     y: i64,
 };
 
+const Operation = enum(u8) {
+    ADDED = '+',
+    DELETED = '-',
+    EQUAL = ' ',
+};
+
+pub fn match(comptime T: type, a: []const T, b: []const T, ia: usize, ib: usize) !bool {
+    const tinfo = @typeInfo(T);
+    switch (tinfo) {
+        .Int => return a[ia] == b[ib],
+        .Pointer => return std.mem.eql(@TypeOf(a[ia][0]), a[ia], b[ib]),
+        else => return error.NotImplemented,
+    }
+}
+
 /// Written to study Myers diff algorithm
 ///
 /// By difference we mean the number of changes and the actions needed to
@@ -46,7 +61,7 @@ pub fn diff(allocator: std.mem.Allocator, comptime T: type, a: []const T, b: []c
             y = x - k;
 
             // TODO: Allow [][]u8
-            while (x < a.len and y < b.len and a[@intCast(x)] == b[@intCast(y)]) {
+            while (x < a.len and y < b.len and try match(T, a, b, @intCast(x), @intCast(y))) {
                 x += 1;
                 y += 1;
             }
@@ -113,45 +128,52 @@ fn visualizeDiff(
         const b_idx: usize = @intCast(@max(trace[idx].y - 1, 0));
 
         switch (case) {
-            0 => print(T, "{c}\n", .{a[a_idx]}),
-            1 => print(T, "-{c}\n", .{a[a_idx]}),
-            -1 => print(T, "+{c}\n", .{b[b_idx]}),
+            0 => print(T, Operation.EQUAL, .{a[a_idx]}),
+            1 => print(T, Operation.DELETED, .{a[a_idx]}),
+            -1 => print(T, Operation.ADDED, .{b[b_idx]}),
             else => unreachable,
         }
     }
 }
 
 // TODO: Handle more types
-fn print(comptime T: type, comptime fmt: []const u8, args: anytype) void {
+fn print(comptime T: type, op: Operation, args: anytype) void {
     const typeinfo = @typeInfo(T);
+    std.debug.print("{c}", .{@intFromEnum(op)});
     switch (typeinfo) {
         .Int => {
             if (typeinfo.Int.bits == 8) {
-                std.log.info(fmt, args);
+                std.log.info("{c}\n", args);
             } else {
-                std.log.info(fmt, args);
+                std.log.info("{d}\n", args);
+            }
+        },
+        .Pointer => {
+            if (typeinfo.Pointer.child == u8) {
+                std.debug.print("{s}\n", args);
             }
         },
         else => {
-            std.log.info("{any}\n", args);
+            std.debug.print("{any}\n", args);
         },
     }
 }
 
-test "[]const u8 diff" {
-    const a = "ABCABBA";
-    const b = "CBABAC";
-    const trace = try diff(std.testing.allocator, u8, a, b);
-    defer std.testing.allocator.free(trace);
-    try std.testing.expect(trace.len == 10);
-    try std.testing.expectEqual(Point{ .x = 7, .y = 6 }, trace[0]);
-    try std.testing.expectEqual(Point{ .x = 0, .y = 0 }, trace[9]);
-}
-
-// test "[]const []const u8 diff" {
-//     const a = [_][]const u8{ "this is the first line", "this is the second line" };
-//     const b = [_][]const u8{ "this is the modified first line", "this is the second line", "this is an added third line" };
-//     const trace = try diff(std.testing.allocator, []const u8, &a, &b);
+// test "[]const u8 diff" {
+//     const a = "ABCABBA";
+//     const b = "CBABAC";
+//     const trace = try diff(std.testing.allocator, u8, a, b);
 //     defer std.testing.allocator.free(trace);
-//     visualizeDiff([]u8, trace, a, b);
+//     try std.testing.expect(trace.len == 10);
+//     try std.testing.expectEqual(Point{ .x = 7, .y = 6 }, trace[0]);
+//     try std.testing.expectEqual(Point{ .x = 0, .y = 0 }, trace[9]);
 // }
+
+test "[]const []const u8 diff" {
+    const a = [_][]const u8{ "this is the first line", "this is the second line" };
+    const b = [_][]const u8{ "this is the modified first line", "this is the second line", "this is an added third line" };
+    const trace = try diff(std.testing.allocator, []const u8, &a, &b);
+    std.debug.print("{d}", .{trace.len});
+    std.debug.print("({d}, {d})\n", .{ trace[0].x, trace[0].y });
+    defer std.testing.allocator.free(trace);
+}
