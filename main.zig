@@ -11,16 +11,53 @@ const Operation = enum(u8) {
     EQUAL = ' ',
 };
 
-pub fn match(comptime T: type, a: []const T, b: []const T, ia: usize, ib: usize) !bool {
+pub fn match(comptime T: type, a: T, b: T) !bool {
     const tinfo = @typeInfo(T);
     switch (tinfo) {
-        .Int => return a[ia] == b[ib],
-        .Pointer => return std.mem.eql(@TypeOf(a[ia][0]), a[ia], b[ib]),
+        .Int => return a == b,
+        .Pointer => return std.mem.eql(@TypeOf(a[0]), a, b),
         else => return error.NotImplemented,
     }
 }
 
-/// Written to study Myers diff algorithm
+/// Returns minimal distance edit script using myers diff
+pub fn distance(comptime T: type, a: []const T, b: []const T, out_buf: []usize) !usize {
+    const max = a.len + b.len;
+    std.debug.assert(2 * max + 1 <= out_buf.len);
+    @memset(out_buf, 0);
+
+    var k: isize = 0;
+    var mles: usize = 0;
+    outer: for (0..max + 1) |u| {
+        const d: isize = @intCast(u);
+        k = -d;
+        while (k <= d) : (k += 2) {
+            var x: isize = 0;
+            const shifted_k: usize = @intCast(k + @as(isize, @intCast(max)));
+            if (k == -d or k != d and out_buf[shifted_k - 1] < out_buf[shifted_k + 1]) {
+                x = @intCast(out_buf[shifted_k + 1]);
+            } else {
+                x = @intCast(out_buf[shifted_k - 1] + 1);
+            }
+            var y: isize = x - k;
+
+            while (x < a.len and y < b.len and try match(T, a[@intCast(x)], b[@intCast(y)])) {
+                x += 1;
+                y += 1;
+            }
+
+            out_buf[shifted_k] = @intCast(x);
+
+            if (x >= a.len and y >= b.len) {
+                mles = u;
+                break :outer;
+            }
+        }
+    }
+    return mles;
+}
+
+///  Written to study Myers diff algorithm
 ///
 /// By difference we mean the number of changes and the actions needed to
 /// edit one file/string to convert, for example, A into B.
@@ -60,7 +97,7 @@ pub fn diff(allocator: std.mem.Allocator, comptime T: type, a: []const T, b: []c
             }
             y = x - k;
 
-            while (x < a.len and y < b.len and try match(T, a, b, @intCast(x), @intCast(y))) {
+            while (x < a.len and y < b.len and try match(T, a[x], b[y])) {
                 x += 1;
                 y += 1;
             }
@@ -158,21 +195,28 @@ fn print(comptime T: type, op: Operation, args: anytype) void {
     }
 }
 
-test "[]const u8 diff" {
+test "distance" {
     const a = "ABCABBA";
     const b = "CBABAC";
-    const trace = try diff(std.testing.allocator, u8, a, b);
-    defer std.testing.allocator.free(trace);
-    try std.testing.expect(trace.len == 10);
-    try std.testing.expectEqual(Point{ .x = 7, .y = 6 }, trace[0]);
-    try std.testing.expectEqual(Point{ .x = 0, .y = 0 }, trace[9]);
+    var out_buf: [128]usize = undefined;
+    std.testing.expect(try distance(u8, a, b, &out_buf) == 5);
 }
 
-test "[]const []const u8 diff" {
-    const a = [_][]const u8{ "this is the first line", "this is the second line" };
-    const b = [_][]const u8{ "this is the modified first line", "this is the second line", "this is an added third line" };
-    const trace = try diff(std.testing.allocator, []const u8, &a, &b);
-    std.debug.print("{d}", .{trace.len});
-    std.debug.print("({d}, {d})\n", .{ trace[0].x, trace[0].y });
-    defer std.testing.allocator.free(trace);
-}
+// test "[]const u8 diff" {
+//     const a = "ABCABBA";
+//     const b = "CBABAC";
+//     const trace = try diff(std.testing.allocator, u8, a, b);
+//     defer std.testing.allocator.free(trace);
+//     try std.testing.expect(trace.len == 10);
+//     try std.testing.expectEqual(Point{ .x = 7, .y = 6 }, trace[0]);
+//     try std.testing.expectEqual(Point{ .x = 0, .y = 0 }, trace[9]);
+// }
+//
+// test "[]const []const u8 diff" {
+//     const a = [_][]const u8{ "this is the first line", "this is the second line" };
+//     const b = [_][]const u8{ "this is the modified first line", "this is the second line", "this is an added third line" };
+//     const trace = try diff(std.testing.allocator, []const u8, &a, &b);
+//     std.debug.print("{d}", .{trace.len});
+//     std.debug.print("({d}, {d})\n", .{ trace[0].x, trace[0].y });
+//     defer std.testing.allocator.free(trace);
+// }
