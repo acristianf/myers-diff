@@ -60,7 +60,6 @@ pub fn diff(allocator: std.mem.Allocator, comptime T: type, a: []const T, b: []c
             }
             y = x - k;
 
-            // TODO: Allow [][]u8
             while (x < a.len and y < b.len and try match(T, a, b, @intCast(x), @intCast(y))) {
                 x += 1;
                 y += 1;
@@ -159,15 +158,15 @@ fn print(comptime T: type, op: Operation, args: anytype) void {
     }
 }
 
-// test "[]const u8 diff" {
-//     const a = "ABCABBA";
-//     const b = "CBABAC";
-//     const trace = try diff(std.testing.allocator, u8, a, b);
-//     defer std.testing.allocator.free(trace);
-//     try std.testing.expect(trace.len == 10);
-//     try std.testing.expectEqual(Point{ .x = 7, .y = 6 }, trace[0]);
-//     try std.testing.expectEqual(Point{ .x = 0, .y = 0 }, trace[9]);
-// }
+test "[]const u8 diff" {
+    const a = "ABCABBA";
+    const b = "CBABAC";
+    const trace = try diff(std.testing.allocator, u8, a, b);
+    defer std.testing.allocator.free(trace);
+    try std.testing.expect(trace.len == 10);
+    try std.testing.expectEqual(Point{ .x = 7, .y = 6 }, trace[0]);
+    try std.testing.expectEqual(Point{ .x = 0, .y = 0 }, trace[9]);
+}
 
 test "[]const []const u8 diff" {
     const a = [_][]const u8{ "this is the first line", "this is the second line" };
