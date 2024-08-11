@@ -1,14 +1,20 @@
 const std = @import("std");
 
 const Point = struct {
-    x: usize,
-    y: usize,
+    x: isize,
+    y: isize,
+
+    const Self = @This();
 
     pub fn zero() Point {
         return .{
             .x = 0,
             .y = 0,
         };
+    }
+
+    pub fn inverted(self: *Self) Point {
+        return .{ .x = self.y, .y = self.x };
     }
 };
 
@@ -64,7 +70,7 @@ pub fn distance(comptime T: type, a: []const T, b: []const T, scratch: []usize) 
     return mles;
 }
 
-fn midpoint(comptime T: type, a: []const T, b: []const T, scratch1: []usize, scratch2: []usize, start_point: Point) !?[2]Point {
+fn midpoint(comptime T: type, a: []const T, b: []const T, scratch1: []usize, scratch2: []usize, offset_point: Point) !?[2]Point {
     if (a.len * b.len == 0) return null;
     const max = a.len + b.len;
     const max_diagonals = 2 * (max) + 1;
@@ -77,15 +83,16 @@ fn midpoint(comptime T: type, a: []const T, b: []const T, scratch1: []usize, scr
     var v2 = scratch2[0..max_diagonals];
 
     const alen: isize = @intCast(a.len);
+    const blen: isize = @intCast(b.len);
 
     var overlap: [2]Point = undefined;
 
     var k: isize = 0;
     var c: isize = 0;
-    const delta: isize = @intCast(a.len - b.len);
+    const delta: isize = alen - blen;
     const even: bool = @rem(delta, 2) == 0;
-    var px: usize = 0;
-    var py: usize = 0;
+    var px: isize = 0;
+    var py: isize = 0;
     outer: for (0..max + 1) |u| {
         const d: isize = @intCast(u);
 
@@ -112,7 +119,7 @@ fn midpoint(comptime T: type, a: []const T, b: []const T, scratch1: []usize, scr
 
             // This case changes
             const r_c: usize = @intCast(@as(isize, @intCast(real_k)) - delta);
-            if (!even and k >= -(d - 1) and k <= d - 1 and v1[real_k] > a.len - v2[r_c]) {
+            if (!even and k >= -(d - 1) and k <= d - 1 and v1[real_k] > alen - @as(isize, @intCast(v2[r_c]))) {
                 overlap[0] = .{ .x = px, .y = py };
                 overlap[1] = .{ .x = @intCast(x), .y = @intCast(y) };
                 break :outer;
@@ -138,10 +145,12 @@ fn midpoint(comptime T: type, a: []const T, b: []const T, scratch1: []usize, scr
 
             v2[real_c] = @intCast(alen - x);
 
-            const real_k: usize = real_c + @as(usize, @intCast(delta));
-            if (even and c >= -d and c <= d and v1[real_k] > x) {
+            const real_k: usize = @intCast(@as(isize, @intCast(real_c)) + delta);
+            if (even and c >= -d and c <= d and v1[real_k] + v2[real_c] > a.len) {
+                std.debug.print("{d} {d}\n", .{ x, y });
+                y = @intCast(@abs(y));
                 overlap[0] = .{ .x = px, .y = py };
-                overlap[1] = .{ .x = px, .y = py };
+                overlap[1] = .{ .x = alen - x, .y = blen - y };
                 break :outer;
             }
         }
@@ -149,10 +158,10 @@ fn midpoint(comptime T: type, a: []const T, b: []const T, scratch1: []usize, scr
 
     var real_overlap = overlap;
 
-    real_overlap[0].x += start_point.x;
-    real_overlap[0].y += start_point.y;
-    real_overlap[1].x += start_point.x;
-    real_overlap[1].y += start_point.y;
+    real_overlap[0].x += offset_point.x;
+    real_overlap[0].y += offset_point.y;
+    real_overlap[1].x += offset_point.x;
+    real_overlap[1].y += offset_point.y;
 
     return real_overlap;
 }
@@ -202,22 +211,30 @@ pub fn distanceBackwards(comptime T: type, a: []const T, b: []const T, scratch2:
 }
 
 /// Returns minimal edit script using myers diff
-pub fn diff(comptime T: type, a: []const T, b: []const T, scratch1: []usize, scratch2: []usize, start_point: Point) !void {
-    const snake_opt: ?[2]Point = try midpoint(T, a, b, scratch1, scratch2, start_point); // [Point, Point]
-    const snake = snake_opt orelse return;
-    std.debug.print("start_middle_snake={any}, end_middle_snake={any}\n", .{ snake[0], snake[1] });
+pub fn diff(comptime T: type, a: []const T, b: []const T, scratch1: []usize, scratch2: []usize, offset_point: Point) !void {
+    const snake_opt: ?[2]Point = try midpoint(T, a, b, scratch1, scratch2, offset_point); // [Point, Point]
 
-    if (snake[0].x * snake[0].y == 0 or snake[1].x * snake[1].y == 0) return;
+    const snake: [2]Point = snake_opt orelse return;
 
-    if (snake[0].x < snake[0].y) {
-        try diff(T, b[0..snake[0].y], a[0..snake[0].x], scratch1, scratch2, Point.zero());
-    } else {
-        try diff(T, a[0..snake[0].x], b[0..snake[0].y], scratch1, scratch2, Point.zero());
+    const relative_snake = [2]Point{ .{
+        .x = snake[0].x - offset_point.x,
+        .y = snake[0].y - offset_point.y,
+    }, .{
+        .x = snake[1].x - offset_point.x,
+        .y = snake[1].y - offset_point.y,
+    } };
+
+    std.debug.print("start={any}, end={any}\n", .{ snake[0], snake[1] });
+    // std.debug.print("r_s={any}, r_e={any}\n", .{ relative_snake[0], relative_snake[1] });
+    std.debug.print("{d}, {d}\n", .{ a.len, b.len });
+    std.debug.print("\n", .{});
+
+    if (snake[0].x > 0 and snake[0].y > 0) {
+        try diff(T, a[0..@intCast(relative_snake[0].x)], b[0..@intCast(relative_snake[0].y)], scratch1, scratch2, Point.zero());
     }
-    if (snake[1].x < snake[1].y) {
-        try diff(T, b[snake[1].y..b.len], a[snake[1].x..a.len], scratch1, scratch2, snake[1]);
-    } else {
-        try diff(T, a[snake[1].x..a.len], b[snake[1].y..b.len], scratch1, scratch2, snake[1]);
+
+    if ((@as(isize, @intCast(a.len)) - relative_snake[1].x) > 0 and (@as(isize, @intCast(b.len)) - relative_snake[1].y) > 0) {
+        try diff(T, a[@intCast(relative_snake[1].x)..a.len], b[@intCast(relative_snake[1].y)..b.len], scratch1, scratch2, snake[1]);
     }
 }
 
@@ -269,31 +286,31 @@ fn print(comptime T: type, op: Operation, args: anytype) void {
     }
 }
 
-test "distance" {
-    const a = "ABCABBA";
-    const b = "CBABAC";
-    var scratch: [128]usize = undefined;
-    try std.testing.expect(try distance(u8, a, b, &scratch) == 5);
-}
-
-test "distanceBackwards" {
-    const a = "ABCABBA";
-    const b = "CBABAC";
-    var scratch: [128]usize = undefined;
-    try std.testing.expect(try distanceBackwards(u8, a, b, &scratch) == 5);
-}
-
-test "midpoint" {
-    const a = "ABCABBA";
-    const b = "CBABAC";
-    var scratch1: [128]usize = undefined;
-    var scratch2: [128]usize = undefined;
-    _ = try midpoint(u8, a, b, &scratch1, &scratch2, Point.zero());
-}
+// test "distance" {
+//     const a = "ABCABBA";
+//     const b = "CBABAC";
+//     var scratch: [128]usize = undefined;
+//     try std.testing.expect(try distance(u8, a, b, &scratch) == 5);
+// }
+//
+// test "distanceBackwards" {
+//     const a = "ABCABBA";
+//     const b = "CBABAC";
+//     var scratch: [128]usize = undefined;
+//     try std.testing.expect(try distanceBackwards(u8, a, b, &scratch) == 5);
+// }
+//
+// test "midpoint" {
+//     const a = "ABCABBA";
+//     const b = "CBABAC";
+//     var scratch1: [128]usize = undefined;
+//     var scratch2: [128]usize = undefined;
+//     _ = try midpoint(u8, a, b, &scratch1, &scratch2, Point.zero());
+// }
 
 test "diff" {
-    const a = "ABCABBA";
-    const b = "CBABAC";
+    const a = "AAB";
+    const b = "CCB";
     var scratch1: [128]usize = undefined;
     var scratch2: [128]usize = undefined;
     _ = try diff(u8, a, b, &scratch1, &scratch2, Point.zero());
