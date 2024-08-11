@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const Point = struct {
+    const Self = @This();
     x: isize,
     y: isize,
 
@@ -9,6 +10,10 @@ const Point = struct {
             .x = 0,
             .y = 0,
         };
+    }
+
+    pub fn eql(self: *const Self, b: Point) bool {
+        return self.x == b.x and self.y == b.y;
     }
 };
 
@@ -143,7 +148,12 @@ fn MyersDiff(comptime T: type) type {
 
         fn findPath(self: *Self, off: Point, limit: Point, array: *std.ArrayList([2]Point)) !void {
             const snake_opt = try self.midpoint(off, limit);
-            const snake = snake_opt orelse return;
+            const snake = snake_opt orelse {
+                if (!off.eql(limit)) {
+                    try array.append(.{ off, limit });
+                }
+                return;
+            };
 
             try array.append(snake);
 
