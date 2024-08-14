@@ -155,12 +155,11 @@ fn MyersDiff(comptime T: type) type {
                 return;
             };
 
-            try array.append(snake);
-
             const start = snake[0];
             const finish = snake[1];
 
             try self.findPath(off, .{ .x = start.x, .y = start.y }, array);
+            try array.append(snake);
             try self.findPath(.{ .x = finish.x, .y = finish.y }, limit, array);
         }
 
