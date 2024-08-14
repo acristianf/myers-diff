@@ -33,7 +33,7 @@ fn MyersDiff(comptime T: type) type {
             const max_diagonals: usize = 2 * (f1.len + f2.len) + 1;
             const maxd2: isize = @intCast(try std.math.divCeil(isize, @intCast(max_diagonals), 2));
 
-            return Self{
+            var o = Self{
                 .allocator = allocator,
                 .a = f1,
                 .b = f2,
@@ -41,6 +41,13 @@ fn MyersDiff(comptime T: type) type {
                 .vb = try allocator.alloc(usize, max_diagonals),
                 .v_mid = maxd2,
             };
+
+            if (f1.len < f2.len) {
+                o.a = f2;
+                o.b = f1;
+            }
+
+            return o;
         }
 
         fn midpoint(self: *Self, off: Point, limit: Point) !?[2]Point {
