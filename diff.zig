@@ -190,7 +190,16 @@ test "diff" {
     defer m_d.deinit();
     try m_d.diff(&array);
 
-    for (array.items) |it| {
-        std.debug.print("{any}\n", .{it});
-    }
+    try std.testing.expect(array.items[0][0].eql(.{ .x = 0, .y = 0 }));
+    try std.testing.expect(array.items[0][1].eql(.{ .x = 1, .y = 0 }));
+    try std.testing.expect(array.items[1][0].eql(.{ .x = 1, .y = 0 }));
+    try std.testing.expect(array.items[1][1].eql(.{ .x = 2, .y = 0 }));
+    try std.testing.expect(array.items[2][0].eql(.{ .x = 2, .y = 0 }));
+    try std.testing.expect(array.items[2][1].eql(.{ .x = 3, .y = 1 }));
+    try std.testing.expect(array.items[3][0].eql(.{ .x = 3, .y = 1 }));
+    try std.testing.expect(array.items[3][1].eql(.{ .x = 5, .y = 4 }));
+    try std.testing.expect(array.items[4][0].eql(.{ .x = 5, .y = 4 }));
+    try std.testing.expect(array.items[4][1].eql(.{ .x = 6, .y = 4 }));
+    try std.testing.expect(array.items[5][0].eql(.{ .x = 6, .y = 4 }));
+    try std.testing.expect(array.items[5][1].eql(.{ .x = 7, .y = 6 }));
 }
