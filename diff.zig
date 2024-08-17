@@ -179,7 +179,7 @@ pub fn MyersDiff(comptime T: type) type {
                     var x: isize = off.x + (y - off.y) + in_k;
                     px = if (d == 0 or y != py) x else x + 1;
 
-                    while (x > off.x and y > off.y and match(T, self.a[@intCast(x)], self.b[@intCast(y)])) {
+                    while (x > off.x and y > off.y and match(T, self.a[@intCast(x - 1)], self.b[@intCast(y - 1)])) {
                         x -= 1;
                         y -= 1;
                     }
