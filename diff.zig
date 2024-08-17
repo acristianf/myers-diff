@@ -5,17 +5,27 @@ const Point = struct {
     x: isize,
     y: isize,
 
-    pub fn zero() Point {
+    pub fn zero() Self {
         return .{
             .x = 0,
             .y = 0,
         };
     }
 
-    pub fn eql(self: *const Self, b: Point) bool {
+    pub fn eql(self: *const Self, b: Self) bool {
         return self.x == b.x and self.y == b.y;
     }
 };
+
+// TODO: Handle more robustly
+// Not robust
+fn match(comptime T: type, a: T, b: T) bool {
+    const typeinfo = @typeInfo(T);
+    switch (typeinfo) {
+        .Pointer => return std.mem.eql(typeinfo.Pointer.child, a, b),
+        else => return a == b,
+    }
+}
 
 pub fn MyersDiff(comptime T: type) type {
     return struct {
@@ -75,7 +85,7 @@ pub fn MyersDiff(comptime T: type) type {
                     }
                     var y: isize = x - k;
 
-                    while (x < self.a.len and y < self.b.len and self.a[@intCast(x)] == self.b[@intCast(y)]) {
+                    while (x < self.a.len and y < self.b.len and match(T, self.a[@intCast(x)], self.b[@intCast(y)])) {
                         x += 1;
                         y += 1;
                     }
@@ -131,7 +141,7 @@ pub fn MyersDiff(comptime T: type) type {
                     var y: isize = off.y + x - off.x - k;
                     py = if (d == 0 or x != px) y else y - 1;
 
-                    while (x < limit.x and y < limit.y and self.a[@intCast(x)] == self.b[@intCast(y)]) {
+                    while (x < limit.x and y < limit.y and match(T, self.a[@intCast(x)], self.b[@intCast(y)])) {
                         x += 1;
                         y += 1;
                     }
@@ -169,7 +179,7 @@ pub fn MyersDiff(comptime T: type) type {
                     var x: isize = off.x + (y - off.y) + in_k;
                     px = if (d == 0 or y != py) x else x + 1;
 
-                    while (x > off.x and y > off.y and self.a[@intCast(x - 1)] == self.b[@intCast(y - 1)]) {
+                    while (x > off.x and y > off.y and match(T, self.a[@intCast(x)], self.b[@intCast(y)])) {
                         x -= 1;
                         y -= 1;
                     }
