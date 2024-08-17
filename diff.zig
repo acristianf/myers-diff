@@ -17,7 +17,7 @@ const Point = struct {
     }
 };
 
-fn MyersDiff(comptime T: type) type {
+pub fn MyersDiff(comptime T: type) type {
     return struct {
         const Self = @This();
 
@@ -48,6 +48,47 @@ fn MyersDiff(comptime T: type) type {
             }
 
             return o;
+        }
+
+        pub fn distance(self: *Self) !usize {
+            const size: usize = self.a.len + self.b.len;
+            if (size == 0) return 0;
+
+            const max: isize = @intCast(try std.math.divCeil(usize, size, 2));
+
+            @memset(self.vf, 0);
+            self.vf[@as(usize, @intCast(self.v_mid)) + 1] = 0;
+
+            var d: isize = 0;
+            var r: usize = 0;
+            outer: for (0..@intCast(max)) |idx| {
+                d = @intCast(idx);
+
+                var k: isize = -d;
+                while (k <= d) : (k += 2) {
+                    var x: isize = 0;
+                    const off_k: usize = @intCast(k + self.v_mid);
+                    if (k == -d or k != d and self.vf[off_k - 1] < self.vf[off_k + 1]) {
+                        x = @intCast(self.vf[off_k + 1]);
+                    } else {
+                        x = @intCast(self.vf[off_k - 1] + 1);
+                    }
+                    var y: isize = x - k;
+
+                    while (x < self.a.len and y < self.b.len and self.a[@intCast(x)] == self.b[@intCast(y)]) {
+                        x += 1;
+                        y += 1;
+                    }
+
+                    self.vf[off_k] = @intCast(x);
+
+                    if (x >= self.a.len and y >= self.b.len) {
+                        r = idx;
+                        break :outer;
+                    }
+                }
+            }
+            return r;
         }
 
         fn midpoint(self: *Self, off: Point, limit: Point) !?[2]Point {
@@ -202,4 +243,26 @@ test "diff" {
     try std.testing.expect(array.items[4][1].eql(.{ .x = 6, .y = 4 }));
     try std.testing.expect(array.items[5][0].eql(.{ .x = 6, .y = 4 }));
     try std.testing.expect(array.items[5][1].eql(.{ .x = 7, .y = 6 }));
+}
+
+test "distance" {
+    const allo = std.testing.allocator;
+
+    var m_d = try MyersDiff(u8).init(allo, "abcabba", "cbabac");
+    defer m_d.deinit();
+
+    try std.testing.expect((try m_d.distance()) == 5);
+}
+
+test "eql" {
+    const allo = std.testing.allocator;
+    var m_d = try MyersDiff(u8).init(allo, "aaa", "aaa");
+    defer m_d.deinit();
+
+    var array = std.ArrayList([2]Point).init(allo);
+    defer array.deinit();
+
+    try m_d.diff(&array);
+
+    try std.testing.expect(array.items.len == 1);
 }
